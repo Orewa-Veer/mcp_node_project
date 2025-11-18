@@ -1,0 +1,29 @@
+{
+  "name": "mcp-node-backend",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon --watch './**/*.js' index.js",
+    "build": "prisma generate",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev --name init --create-only",
+    "prisma:dbpush": "prisma db push",
+    "prisma:seed": "node prisma/seed.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "googleapis": "^118.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.1",
+    "@prisma/client": "^5.13.0",
+    "prisma": "^5.13.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  }
+}

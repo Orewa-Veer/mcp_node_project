@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Doctor Dashboard — MCP Assistant</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        font-family: system-ui, Arial;
+        padding: 2rem;
+        background: #f5f5f5;
+      }
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+        background: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #333;
+      }
+      h2 {
+        color: #666;
+        margin-top: 2rem;
+        border-bottom: 2px solid #007bff;
+        padding-bottom: 0.5rem;
+      }
+      .login-form {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 2rem;
+      }
+      input,
+      button {
+        padding: 0.75rem;
+        font-size: 1rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      input {
+        flex: 1;
+      }
+      button {
+        background: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-weight: bold;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      button.danger {
+        background: #dc3545;
+      }
+      button.danger:hover {
+        background: #c82333;
+      }
+      button.success {
+        background: #28a745;
+      }
+      button.success:hover {
+        background: #218838;
+      }
+      .stat {
+        display: inline-block;
+        background: #f0f0f0;
+        padding: 1rem;
+        border-radius: 4px;
+        margin: 0.5rem 1rem 0.5rem 0;
+        text-align: center;
+        min-width: 150px;
+      }
+      .stat-num {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #007bff;
+      }
+      .stat-label {
+        color: #666;
+        font-size: 0.9rem;
+      }
+      .appointment {
+        background: #f9f9f9;
+        padding: 1rem;
+        border-left: 4px solid #007bff;
+        margin: 0.5rem 0;
+        border-radius: 4px;
+      }
+      .time {
+        color: #666;
+        font-weight: bold;
+      }
+      .patient {
+        color: #333;
+      }
+      .message {
+        padding: 1rem;
+        border-radius: 4px;
+        margin: 1rem 0;
+      }
+      .success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      .hidden {
+        display: none;
+      }
+    </style>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <h1>👨‍⚕️ Doctor Dashboard</h1>
+      <div id="app"></div>
+    </div>
+
+    <script>
+      const { useState } = React;
+
+      function DoctorApp() {
+        const [token, setToken] = useState(
+          localStorage.getItem("doctor_token")
+        );
+        const [doctor, setDoctor] = useState(() => {
+          const stored = localStorage.getItem("doctor_info");
+          return stored ? JSON.parse(stored) : null;
+        });
+        const [doctorName, setDoctorName] = useState("");
+        const [dashboard, setDashboard] = useState(null);
+        const [message, setMessage] = useState("");
+        const [loading, setLoading] = useState(false);
+
+        async function login() {
+          if (!doctorName.trim()) return;
+          setLoading(true);
+          try {
+            const res = await fetch("http://localhost:3000/doctor/login", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ doctorName }),
+            });
+            const data = await res.json();
+            if (data.ok) {
+              setToken(data.token);
+              setDoctor(data.doctor);
+              localStorage.setItem("doctor_token", data.token);
+              localStorage.setItem("doctor_info", JSON.stringify(data.doctor));
+              setMessage({
+                type: "success",
+                text: `Welcome, Dr. ${data.doctor.name}!`,
+              });
+              loadDashboard(data.doctor.id);
+              setDoctorName("");
+            } else {
+              setMessage({ type: "error", text: data.error });
+            }
+          } catch (err) {
+            setMessage({ type: "error", text: String(err) });
+          } finally {
+            setLoading(false);
+          }
+        }
+
+        async function loadDashboard(id) {
+          setLoading(true);
+          try {
+            const res = await fetch(
+              `http://localhost:3000/doctor/dashboard/${id}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              }
+            );
+            const data = await res.json();
+            if (data.ok) {
+              setDashboard(data);
+            } else {
+              setMessage({ type: "error", text: data.error });
+            }
+          } catch (err) {
+            setMessage({ type: "error", text: String(err) });
+          } finally {
+            setLoading(false);
+          }
+        }
+
+        async function triggerReport() {
+          if (!doctor) return;
+          setLoading(true);
+          try {
+            const res = await fetch("http://localhost:3000/doctor/report", {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                doctorId: doctor.id,
+              }),
+            });
+            const data = await res.json();
+            if (data.ok) {
+              setMessage({
+                type: "success",
+                text: `Report sent! (Slack notification ${
+                  data.notification.mock ? "(mock)" : "(sent)"
+                })`,
+              });
+              // Refresh dashboard
+              loadDashboard(doctor.id);
+            } else {
+              setMessage({ type: "error", text: data.error });
+            }
+          } catch (err) {
+            setMessage({ type: "error", text: String(err) });
+          } finally {
+            setLoading(false);
+          }
+        }
+
+        function logout() {
+          setToken(null);
+          setDoctor(null);
+          setDashboard(null);
+          localStorage.removeItem("doctor_token");
+          localStorage.removeItem("doctor_info");
+          setMessage({ type: "success", text: "Logged out." });
+        }
+
+        if (!token || !doctor) {
+          return React.createElement(
+            "div",
+            null,
+            React.createElement("h2", null, "Doctor Login"),
+            message
+              ? React.createElement(
+                  "div",
+                  { className: `message ${message.type}` },
+                  message.text
+                )
+              : null,
+            React.createElement(
+              "div",
+              { className: "login-form" },
+              React.createElement("input", {
+                type: "text",
+                value: doctorName,
+                onChange: (e) => setDoctorName(e.target.value),
+                placeholder: "Enter your name (e.g., Dr. Ahuja)",
+                onKeyPress: (e) => e.key === "Enter" && login(),
+              }),
+              React.createElement(
+                "button",
+                { onClick: login, disabled: loading },
+                loading ? "Logging in..." : "Login"
+              )
+            ),
+            React.createElement(
+              "div",
+              null,
+              React.createElement("em", null, "Available doctors: Dr. Ahuja")
+            )
+          );
+        }
+
+        return React.createElement(
+          "div",
+          null,
+          React.createElement(
+            "div",
+            {
+              style: {
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              },
+            },
+            React.createElement(
+              "div",
+              null,
+              React.createElement("p", null, `Logged in as: ${doctor.name}`),
+              React.createElement("p", null, `Email: ${doctor.email || "N/A"}`)
+            ),
+            React.createElement(
+              "button",
+              { onClick: logout, className: "danger" },
+              "Logout"
+            )
+          ),
+
+          message
+            ? React.createElement(
+                "div",
+                { className: `message ${message.type}` },
+                message.text
+              )
+            : null,
+
+          dashboard
+            ? React.createElement(
+                "div",
+                null,
+                React.createElement("h2", null, "📊 Statistics"),
+                React.createElement(
+                  "div",
+                  null,
+                  React.createElement(
+                    "div",
+                    { className: "stat" },
+                    React.createElement(
+                      "div",
+                      { className: "stat-num" },
+                      dashboard.stats.visitsYesterday
+                    ),
+                    React.createElement(
+                      "div",
+                      { className: "stat-label" },
+                      "Patients Yesterday"
+                    )
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "stat" },
+                    React.createElement(
+                      "div",
+                      { className: "stat-num" },
+                      dashboard.stats.appointmentsToday
+                    ),
+                    React.createElement(
+                      "div",
+                      { className: "stat-label" },
+                      "Appointments Today"
+                    )
+                  ),
+                  React.createElement(
+                    "div",
+                    { className: "stat" },
+                    React.createElement(
+                      "div",
+                      { className: "stat-num" },
+                      dashboard.stats.appointmentsTomorrow
+                    ),
+                    React.createElement(
+                      "div",
+                      { className: "stat-label" },
+                      "Appointments Tomorrow"
+                    )
+                  )
+                ),
+                React.createElement(
+                  "button",
+                  {
+                    onClick: triggerReport,
+                    className: "success",
+                    disabled: loading,
+                  },
+                  loading ? "Sending..." : "📢 Send Report to Slack"
+                ),
+
+                React.createElement("h2", null, "📅 Today's Appointments"),
+                dashboard.appointmentsToday.length > 0
+                  ? dashboard.appointmentsToday.map((a) =>
+                      React.createElement(
+                        "div",
+                        { key: a.id, className: "appointment" },
+                        React.createElement(
+                          "div",
+                          { className: "time" },
+                          new Date(a.startTs).toLocaleTimeString()
+                        ),
+                        React.createElement(
+                          "div",
+                          { className: "patient" },
+                          a.patientName
+                        ),
+                        React.createElement("div", null, a.patientEmail)
+                      )
+                    )
+                  : React.createElement("p", null, "✅ No appointments today"),
+
+                React.createElement("h2", null, "📆 Tomorrow's Appointments"),
+                dashboard.appointmentsTomorrow.length > 0
+                  ? dashboard.appointmentsTomorrow.map((a) =>
+                      React.createElement(
+                        "div",
+                        { key: a.id, className: "appointment" },
+                        React.createElement(
+                          "div",
+                          { className: "time" },
+                          new Date(a.startTs).toLocaleTimeString()
+                        ),
+                        React.createElement(
+                          "div",
+                          { className: "patient" },
+                          a.patientName
+                        ),
+                        React.createElement("div", null, a.patientEmail)
+                      )
+                    )
+                  : React.createElement(
+                      "p",
+                      null,
+                      "No appointments scheduled for tomorrow"
+                    )
+              )
+            : loading
+            ? React.createElement("p", null, "Loading...")
+            : null
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("app")).render(
+        React.createElement(DoctorApp)
+      );
+    </script>
+  </body>
+</html>
