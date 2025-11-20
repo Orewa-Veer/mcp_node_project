@@ -175,7 +175,7 @@
         async function loadDashboard(id) {
           setLoading(true);
           try {
-            const res = await fetch(`${BASE_URL}/doctor/dashboard${id}`, {
+            const res = await fetch(`${BASE_URL}/doctor/dashboard/${id}`, {
               headers: {
                 Authorization: `Bearer ${token}`,
               },
