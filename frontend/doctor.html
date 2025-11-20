@@ -160,7 +160,7 @@
                 type: "success",
                 text: `Welcome, Dr. ${data.doctor.name}!`,
               });
-              loadDashboard(data.doctor.id);
+              loadDashboard(data.doctor.id, data.token);
               setDoctorName("");
             } else {
               setMessage({ type: "error", text: data.error });
@@ -171,13 +171,25 @@
             setLoading(false);
           }
         }
+        React.useEffect(() => {
+          if (doctor && token && !dashboard) {
+            loadDashboard(doctor.id, token);
+          }
+        }, []);
 
-        async function loadDashboard(id) {
+        async function loadDashboard(id, tokenOverride) {
+          const authToken = tokenOverride || token;
+
+          if (!authToken) {
+            setMessage({ type: "error", text: "No token found" });
+            return;
+          }
+
           setLoading(true);
           try {
             const res = await fetch(`${BASE_URL}/doctor/dashboard/${id}`, {
               headers: {
-                Authorization: `Bearer ${token}`,
+                Authorization: `Bearer ${authToken}`,
               },
             });
             const data = await res.json();
@@ -216,7 +228,7 @@
                 })`,
               });
               // Refresh dashboard
-              loadDashboard(doctor.id);
+              loadDashboard(doctor.id, token);
             } else {
               setMessage({ type: "error", text: data.error });
             }
