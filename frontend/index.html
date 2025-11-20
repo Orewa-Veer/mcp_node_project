@@ -390,7 +390,7 @@
             end: slot.end,
           };
           try {
-            const res = await fetch(`${BASE_URL}/mcp/invok`, {
+            const res = await fetch(`${BASE_URL}/mcp/invoke`, {
               method: "POST",
               headers: { "content-type": "application/json" },
               body: JSON.stringify({ tool: "schedule", input, sessionId }),
