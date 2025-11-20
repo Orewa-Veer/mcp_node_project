@@ -1,21 +1,16 @@
-import dotenv from 'dotenv';
-import prisma from './prismaClient.js';
+import { PrismaClient } from "@prisma/client";
 
-dotenv.config();
+const globalForPrisma = globalThis;
 
-export async function initDb() {
-    if (!process.env.DATABASE_URL) {
-        console.log('No DATABASE_URL provided — running with in-memory sample data only.');
-        return;
+let prisma;
+
+if (process.env.NODE_ENV === "production") {
+    prisma = new PrismaClient();
+} else {
+    if (!globalForPrisma.prisma) {
+        globalForPrisma.prisma = new PrismaClient();
     }
-
-    await prisma.$connect();
-
-    const count = await prisma.doctor.count();
-    if (count === 0) {
-        await prisma.doctor.create({ data: { name: 'Dr. Ahuja', email: 'ahuja@example.com' } });
-        console.log('Seeded sample doctor Dr. Ahuja');
-    }
+    prisma = globalForPrisma.prisma;
 }
 
-export { prisma };
+export default prisma;
