@@ -333,7 +333,7 @@
         async function send() {
           // call agent endpoint which will use the LLM and MCP tools
           try {
-            const res = await fetch(`${BASE_URL}/agent/promp`, {
+            const res = await fetch(`${BASE_URL}/agent/prompt`, {
               method: "POST",
               headers: { "content-type": "application/json" },
               body: JSON.stringify({ prompt, sessionId }),
