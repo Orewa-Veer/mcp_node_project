@@ -117,6 +117,7 @@
     </style>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="./config.js"></script>
   </head>
   <body>
     <div class="container">
@@ -144,7 +145,7 @@
           if (!doctorName.trim()) return;
           setLoading(true);
           try {
-            const res = await fetch("http://localhost:3000/doctor/login", {
+            const res = await fetch(`${BASE_URL}/doctor/login`, {
               method: "POST",
               headers: { "content-type": "application/json" },
               body: JSON.stringify({ doctorName }),
@@ -174,14 +175,11 @@
         async function loadDashboard(id) {
           setLoading(true);
           try {
-            const res = await fetch(
-              `http://localhost:3000/doctor/dashboard/${id}`,
-              {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-              }
-            );
+            const res = await fetch(`${BASE_URL}/doctor/dashboard${id}`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            });
             const data = await res.json();
             if (data.ok) {
               setDashboard(data);
@@ -199,7 +197,7 @@
           if (!doctor) return;
           setLoading(true);
           try {
-            const res = await fetch("http://localhost:3000/doctor/report", {
+            const res = await fetch(`${BASE_URL}/doctor/report`, {
               method: "POST",
               headers: {
                 "content-type": "application/json",
