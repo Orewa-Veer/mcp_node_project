@@ -199,6 +199,7 @@
     <!-- React + ReactDOM via CDN for simple demo -->
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="./config.js"></script>
   </head>
   <body>
     <div class="container">
@@ -232,7 +233,7 @@
 
         async function createPatientSession(name, email) {
           try {
-            const res = await fetch("http://localhost:3000/patient/session", {
+            const res = await fetch(`${BASE_URL}/patient/session`, {
               method: "POST",
               headers: { "content-type": "application/json" },
               body: JSON.stringify({ patientName: name, patientEmail: email }),
@@ -332,7 +333,7 @@
         async function send() {
           // call agent endpoint which will use the LLM and MCP tools
           try {
-            const res = await fetch("http://localhost:3000/agent/prompt", {
+            const res = await fetch(`${BASE_URL}/agent/promp`, {
               method: "POST",
               headers: { "content-type": "application/json" },
               body: JSON.stringify({ prompt, sessionId }),
@@ -389,7 +390,7 @@
             end: slot.end,
           };
           try {
-            const res = await fetch("http://localhost:3000/mcp/invoke", {
+            const res = await fetch(`${BASE_URL}/mcp/invok`, {
               method: "POST",
               headers: { "content-type": "application/json" },
               body: JSON.stringify({ tool: "schedule", input, sessionId }),
