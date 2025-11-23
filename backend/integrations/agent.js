@@ -38,13 +38,25 @@ Output: {"actions":[{"tool":"clarify","input":{"question":"Hello! How can I help
 === END EXAMPLES ===
 `;
 
+const messages = [{ role: "system", content: SYSTEM_INSTRUCTIONS }];
+
 export async function runAgent({ prompt, sessionId }) {
     // Combine System and User prompt
     const body = `${SYSTEM_INSTRUCTIONS}\n\nCurrent User Request: "${prompt}"`;
+    messages.push({
+        role: "user", content: prompt
+    });
+
+    const newMsg = messages.map((m) => {
+        if (m.role === "tool") {
+            return `[tool:${m.name}] ${m.content}`;
+        }
+        return `[${m.role}] ${m.content}`;
+    }).join("\n");
 
     console.log(`[Agent] Processing request: "${prompt}"`);
 
-    const llmRes = await callLLM(body, {
+    const llmRes = await callLLM(newMsg, {
         max_tokens: 800,
     });
 
@@ -100,6 +112,7 @@ export async function runAgent({ prompt, sessionId }) {
                 ok: true,
                 result: { message: action.input?.question || 'Could you please clarify?' }
             });
+
             continue;
         }
 
@@ -107,6 +120,7 @@ export async function runAgent({ prompt, sessionId }) {
         try {
             console.log(`[Agent] Invoking tool: ${action.tool}`);
             const r = await invokeTool(action.tool, action.input || {}, sessionId || null);
+            messages.push({ role: `tool`, name: action.tool, content: JSON.stringify(r) });
             results.push({ action, ok: true, result: r });
         } catch (err) {
             console.error(`[Agent] Tool ${action.tool} failed:`, err);
