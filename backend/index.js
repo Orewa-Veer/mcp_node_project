@@ -41,6 +41,7 @@ app.post('/mcp/invoke', async (req, res) => {
 
 // Agent endpoint: accept a natural language prompt, use LLM to plan tool calls, run them and return results
 app.post('/agent/prompt', async (req, res) => {
+    console.log(req.body);
     const { prompt, sessionId } = req.body;
     if (!prompt) return res.status(400).json({ ok: false, error: 'prompt is required' });
     try {

@@ -1,62 +1,85 @@
 import { callLLM } from './llm.js';
 import { invokeTool } from '../mcpServer.js';
 
-// Simple agent connector.
-// Given a natural language `prompt` and optional `sessionId`, call the LLM to produce
-// a small plan in JSON with an ordered list of tool invocations, then execute them
-// using the MCP invoker `invokeTool` and return combined results.
+// === THE FIX IS HERE ===
+// We provide specific examples for ALL tools so the AI doesn't get lazy/biased.
+const SYSTEM_INSTRUCTIONS = `
+You are an AI assistant for a clinic. You map user instructions to tool calls.
+You have access to these tools:
+1. 'availability' (args: doctorName, dateFrom, dateTo)
+2. 'schedule' (args: doctorName, time, patientName)
+3. 'report' (args: doctorId)
 
-const SYSTEM_INSTRUCTIONS = `You are an agent that maps user instructions to calls to available MCP tools.
-Respond with JSON only. Output an object with an "actions" array. Each action must have:
- - tool: the tool name (availability|schedule|report)
- - input: an object with fields for that tool
+RULES:
+- Respond with valid JSON only. 
+- Output an object with an "actions" array.
+- Do not output markdown code blocks (like \`\`\`json).
 
-Example:
-{"actions":[{"tool":"availability","input":{"doctorName":"Dr. Ahuja","dateFrom":"2025-11-19T00:00:00Z","dateTo":"2025-11-19T23:59:59Z"}}]}
+=== EXAMPLES (Follow this pattern) ===
 
-If uncertain, prefer to ask a clarifying question by returning a single action: {"tool":"clarify","input":{"question":"..."}}
+User: "Is Dr. Ahuja free tomorrow?"
+Output: {"actions":[{"tool":"availability","input":{"doctorName":"Dr. Ahuja"}}]}
+
+User: "Book an appointment with Dr. Sharma for tomorrow at 10am"
+Output: {"actions":[{"tool":"schedule","input":{"doctorName":"Dr. Sharma","time":"2025-11-20T10:00:00"}}]}
+
+User: "Generate the daily report for doctor ID 5"
+Output: {"actions":[{"tool":"report","input":{"doctorId":5}}]}
+
+User: "Hello"
+Output: {"actions":[{"tool":"clarify","input":{"question":"Hello! How can I help you with your appointments today?"}}]}
+
+=== END EXAMPLES ===
 `;
 
 export async function runAgent({ prompt, sessionId }) {
-    // Build LLM prompt
-    const body = `${SYSTEM_INSTRUCTIONS}\nUser: ${prompt}`;
+    // Combine System and User prompt
+    const body = `${SYSTEM_INSTRUCTIONS}\n\nCurrent User Request: "${prompt}"`;
 
-    const llmRes = await callLLM(body, { max_tokens: 800 });
+    console.log(`[Agent] Processing request: "${prompt}"`);
 
+    const llmRes = await callLLM(body, {
+        max_tokens: 800,
+    });
+
+    // 1. Check for Critical Failures
     if (!llmRes) {
         return { ok: false, error: 'LLM call returned null' };
     }
 
-    // Allow mock responses (ok:false with data) to proceed; only fail if no data at all
-    if (!llmRes.ok && !llmRes.data) {
+    if (llmRes.mock) {
+        throw new Error('LLM is returning mock responses. Check GEMINI_API_KEY in .env');
+    }
+
+    if (!llmRes.ok) {
         return { ok: false, error: 'LLM not configured or call failed', raw: llmRes };
     }
 
-    // The adapter returns `data` which may contain different shapes depending on provider.
-    // We expect the provider to return JSON in `data.text` or similar. Attempt to extract JSON.
-    let text = '';
-    if (llmRes.data) {
-        // try common shapes
-        if (typeof llmRes.data.text === 'string') text = llmRes.data.text;
-        else if (typeof llmRes.data.output === 'string') text = llmRes.data.output;
-        else text = JSON.stringify(llmRes.data);
-    } else if (llmRes.text) {
-        text = llmRes.text;
-    }
+    // 2. Extract Text
+    const rawText = llmRes.text || '';
 
-    // Try to parse JSON from the model output
+    // 3. Parse JSON safely
     let plan = null;
     try {
-        // models sometimes wrap JSON in backticks or markdown; try to find first JSON object
-        const m = text.match(/\{[\s\S]*\}/);
-        const jsonText = m ? m[0] : text;
-        plan = JSON.parse(jsonText);
+        // Strip Markdown code blocks (```json ... ```) if present
+        const jsonString = rawText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+
+        // Find the first { and last } to ignore potential conversational fluff outside JSON
+        const match = jsonString.match(/\{[\s\S]*\}/);
+        const cleanJson = match ? match[0] : jsonString;
+
+        plan = JSON.parse(cleanJson);
     } catch (err) {
-        return { ok: false, error: 'Failed to parse LLM JSON output', rawText: text };
+        console.error("[Agent] JSON Parse Failed:", rawText);
+        return { ok: false, error: 'Failed to parse LLM JSON output', rawText };
     }
 
-    if (!plan || !Array.isArray(plan.actions)) return { ok: false, error: 'LLM plan missing actions array', plan };
+    // 4. Validate Plan Structure
+    if (!plan || !Array.isArray(plan.actions)) {
+        return { ok: false, error: 'LLM plan missing "actions" array', plan };
+    }
 
+    // 5. Execute Tools
     const results = [];
     for (const action of plan.actions) {
         if (!action.tool) {
@@ -64,59 +87,67 @@ export async function runAgent({ prompt, sessionId }) {
             continue;
         }
 
-        // Allow a 'clarify' tool that returns text only
+        // Handle Clarification explicitly
         if (action.tool === 'clarify') {
-            results.push({ action, ok: true, result: { message: action.input?.question || 'Please clarify' } });
+            results.push({
+                action,
+                ok: true,
+                result: { message: action.input?.question || 'Could you please clarify?' }
+            });
             continue;
         }
 
+        // Invoke Real Tools
         try {
+            console.log(`[Agent] Invoking tool: ${action.tool}`);
             const r = await invokeTool(action.tool, action.input || {}, sessionId || null);
             results.push({ action, ok: true, result: r });
         } catch (err) {
+            console.error(`[Agent] Tool ${action.tool} failed:`, err);
             results.push({ action, ok: false, error: String(err) });
         }
     }
 
-    // Generate a human-readable summary from the results using the LLM
+    // 6. Generate Summary
     const summary = await generateSummary(prompt, results);
 
     return { ok: true, actions: results, summary };
 }
 
 async function generateSummary(userPrompt, results) {
-    // Build a summary prompt that asks the LLM to explain the results in plain English
-    const resultsText = results.map(r => {
-        if (!r.ok) return `Action ${r.action?.tool}: failed with error: ${r.error}`;
-        const toolName = r.action?.tool;
-        const result = r.result;
-        if (toolName === 'availability' && result) {
-            const slots = result.slots || [];
-            return `Availability check: Found ${slots.length} available slots.`;
+    // Format tool outputs for the LLM to read
+    const resultsContext = results.map(r => {
+        if (!r.ok) return `Tool '${r.action?.tool}' Failed: ${r.error}`;
+
+        const tool = r.action?.tool;
+        const res = r.result;
+
+        // Simplify complex objects for the summary prompt to save tokens
+        if (tool === 'availability') {
+            const count = res.slots ? res.slots.length : 0;
+            return `Availability Check: Found ${count} slots.`;
         }
-        if (toolName === 'schedule' && result) {
-            return `Scheduled appointment successfully.`;
+        if (tool === 'report') {
+            return `Report Generated: (Success)`;
         }
-        if (toolName === 'report' && result) {
-            return `Report: ${JSON.stringify(result.data)}`;
-        }
-        return `Action ${toolName}: ${JSON.stringify(result)}`;
+
+        // Default catch-all
+        return `Tool '${tool}' Output: ${JSON.stringify(res).substring(0, 200)}...`;
     }).join('\n');
 
-    const summaryPrompt = `User asked: "${userPrompt}"\n\nAgent actions and results:\n${resultsText}\n\nIn 1-2 sentences, summarize the result for the user in friendly English. Be conversational and helpful.`;
+    const summaryPrompt = `
+    You are a helpful assistant.
+    User asked: "${userPrompt}"
+    
+    Tool Results:
+    ${resultsContext}
+    
+    Task: Write a 1-sentence friendly confirmation to the user based on the results. 
+    If a tool failed, mention it politely.
+    `;
 
-    const llmRes = await callLLM(summaryPrompt, { max_tokens: 200 });
+    const llmRes = await callLLM(summaryPrompt, { max_tokens: 150 });
 
-    // Extract text from LLM response
-    let summaryText = '';
-    if (llmRes && llmRes.data && typeof llmRes.data.text === 'string') {
-        summaryText = llmRes.data.text;
-    } else if (llmRes && typeof llmRes.text === 'string') {
-        summaryText = llmRes.text;
-    } else {
-        // Fallback to basic summary if LLM fails
-        summaryText = resultsText || 'Action completed.';
-    }
-
-    return summaryText;
+    // Rely on the normalized .text property
+    return llmRes.text || 'Actions completed successfully.';
 }

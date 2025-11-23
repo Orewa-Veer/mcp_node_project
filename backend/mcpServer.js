@@ -1,11 +1,13 @@
 import { availabilityTool } from './tools/availability.js';
 import { scheduleTool } from './tools/schedule.js';
 import { reportTool } from './tools/report.js';
+import { listDoctorsTool } from './tools/listdoctors.js';
 
 const tools = {
     availability: availabilityTool,
     schedule: scheduleTool,
     report: reportTool,
+    listDoctors: listDoctorsTool
 };
 
 export function listTools() {

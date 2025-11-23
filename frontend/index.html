@@ -5,12 +5,12 @@
     <title>MCP Doctor Assistant</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
+      /* ... existing styles ... */
       * {
         margin: 0;
         padding: 0;
         box-sizing: border-box;
       }
-
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
           "Helvetica Neue", Arial, sans-serif;
@@ -18,7 +18,6 @@
         min-height: 100vh;
         padding: 2rem 1rem;
       }
-
       .container {
         max-width: 900px;
         margin: 0 auto;
@@ -26,39 +25,33 @@
         flex-direction: column;
         gap: 1.5rem;
       }
-
       .header {
         text-align: center;
         color: white;
         margin-bottom: 1rem;
       }
-
       .header h1 {
         font-size: 2.5rem;
         font-weight: 700;
         margin-bottom: 0.5rem;
         text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
       }
-
       .header p {
         font-size: 1rem;
         opacity: 0.95;
       }
-
       .card {
         background: white;
         border-radius: 12px;
         padding: 1.5rem;
         box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
       }
-
       .chat-container {
         display: flex;
         flex-direction: column;
         gap: 1rem;
         height: 500px;
       }
-
       .history {
         flex: 1;
         overflow-y: auto;
@@ -71,30 +64,11 @@
         white-space: pre-wrap;
         word-break: break-word;
       }
-
-      .message-user {
-        background: #e3f2fd;
-        padding: 0.75rem;
-        margin: 0.5rem 0;
-        border-radius: 6px;
-        border-left: 4px solid #667eea;
-        font-weight: 500;
-      }
-
-      .message-bot {
-        background: #f0f4ff;
-        padding: 0.75rem;
-        margin: 0.5rem 0;
-        border-radius: 6px;
-        border-left: 4px solid #764ba2;
-      }
-
       .input-group {
         display: flex;
         flex-direction: column;
         gap: 0.75rem;
       }
-
       textarea {
         width: 100%;
         padding: 1rem;
@@ -105,13 +79,11 @@
         resize: none;
         transition: border-color 0.3s;
       }
-
       textarea:focus {
         outline: none;
         border-color: #667eea;
         box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
       }
-
       button {
         padding: 0.75rem 1.5rem;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -123,36 +95,30 @@
         cursor: pointer;
         transition: transform 0.2s, box-shadow 0.2s;
       }
-
       button:hover {
         transform: translateY(-2px);
         box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
       }
-
       button:active {
         transform: translateY(0);
       }
-
       .slots-container {
         background: #f8f9fa;
         padding: 1.5rem;
         border-radius: 8px;
         border: 1px solid #e0e0e0;
       }
-
       .slots-label {
         font-weight: 600;
         color: #333;
         margin-bottom: 1rem;
         display: block;
       }
-
       .slots-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
         gap: 0.75rem;
       }
-
       .slot-button {
         padding: 0.75rem 1rem;
         background: white;
@@ -163,14 +129,12 @@
         font-weight: 500;
         transition: all 0.3s;
       }
-
       .slot-button:hover {
         background: #667eea;
         color: white;
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
       }
-
       .doctor-info {
         background: #f0f4ff;
         padding: 1rem;
@@ -179,11 +143,9 @@
         font-size: 0.9rem;
         color: #555;
       }
-
       .doctor-info strong {
         color: #667eea;
       }
-
       @media (max-width: 600px) {
         .header h1 {
           font-size: 1.8rem;
@@ -196,9 +158,11 @@
         }
       }
     </style>
-    <!-- React + ReactDOM via CDN for simple demo -->
+    <!-- React + ReactDOM via CDN -->
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+    <!-- Config: Assumes BASE_URL is defined here, e.g. const BASE_URL = "http://localhost:3000"; -->
     <script src="./config.js"></script>
   </head>
   <body>
@@ -211,7 +175,15 @@
     </div>
 
     <script>
-      const { useState } = React;
+      const { useState, useEffect } = React;
+
+      // Fallback if config.js fails to load
+      if (typeof BASE_URL === "undefined") {
+        console.warn(
+          "BASE_URL not found in config.js, defaulting to localhost:4000"
+        );
+        window.BASE_URL = "http://localhost:4000";
+      }
 
       function App() {
         const [sessionId] = useState(() => {
@@ -222,49 +194,17 @@
           return id;
         });
 
-        const [patientToken, setPatientToken] = useState(() => {
-          return localStorage.getItem("patient_token");
-        });
-
         const [prompt, setPrompt] = useState("");
         const [history, setHistory] = useState("");
         const [lastSlots, setLastSlots] = useState([]);
         const [lastDoctor, setLastDoctor] = useState(null);
-
-        async function createPatientSession(name, email) {
-          try {
-            const res = await fetch(`${BASE_URL}/patient/session`, {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ patientName: name, patientEmail: email }),
-            });
-            const data = await res.json();
-            if (data.ok) {
-              setPatientToken(data.token);
-              localStorage.setItem("patient_token", data.token);
-              return true;
-            }
-          } catch (err) {
-            console.error("Session creation error:", err);
-          }
-          return false;
-        }
+        const [loading, setLoading] = useState(false);
 
         function convertToEnglish(data) {
-          // If there's a summary field, use it (already human-readable)
           if (data.summary) return data.summary;
-
-          // If it's a schedule success response
-          if (data.ok && data.ok === true && (data.message || data.success)) {
-            return `✅ Appointment successfully scheduled!`;
-          }
-
-          // If it's an error
-          if (!data.ok && data.error) {
-            return `❌ Error: ${data.error}`;
-          }
-
-          // If it's availability with slots
+          if (data.ok && data.success)
+            return `✅ ${data.message || "Success!"}`;
+          if (!data.ok && data.error) return `❌ Error: ${data.error}`;
           if (data.slots && Array.isArray(data.slots)) {
             const count = data.slots.length;
             const doctorName = data.doctor?.name || "the doctor";
@@ -272,112 +212,64 @@
               count !== 1 ? "s" : ""
             } with ${doctorName}.`;
           }
-
-          // If it's report data
-          if (data.summary && typeof data.summary === "string") {
-            return data.summary;
-          }
-
-          // Fallback: return formatted JSON
           return JSON.stringify(data, null, 2);
         }
 
-        function detectTool(text) {
-          text = (text || "").toLowerCase();
-          if (
-            text.includes("availability") ||
-            text.includes("available") ||
-            text.includes("check")
-          )
-            return "availability";
-          if (text.includes("book") || text.includes("schedule"))
-            return "schedule";
-          if (
-            text.includes("report") ||
-            text.includes("how many") ||
-            text.includes("summary")
-          )
-            return "report";
-          return "availability";
-        }
-
-        function mapInput(text) {
-          if (!text) return { doctorName: "Dr. Ahuja" };
-          if (detectTool(text) === "availability") {
-            const tomorrow = new Date(Date.now() + 24 * 3600 * 1000);
-            return {
-              doctorName: "Dr. Ahuja",
-              dateFrom: tomorrow.toISOString(),
-              dateTo: new Date(
-                tomorrow.getTime() + 24 * 3600 * 1000
-              ).toISOString(),
-            };
-          }
-          if (detectTool(text) === "schedule") {
-            const start = new Date(
-              Date.now() + 24 * 3600 * 1000 + 9 * 3600 * 1000
-            );
-            const base = {
-              doctorName: lastDoctor ? lastDoctor.name : "Dr. Ahuja",
-              patientName: "Jane User",
-              patientEmail: "jane@example.com",
-              start: start.toISOString(),
-              end: new Date(start.getTime() + 30 * 60000).toISOString(),
-            };
-            if (lastDoctor && lastDoctor.id) base.doctorId = lastDoctor.id;
-            return base;
-          }
-          return { doctorName: "Dr. Ahuja" };
-        }
-
         async function send() {
-          // call agent endpoint which will use the LLM and MCP tools
+          if (!prompt.trim()) return;
+
+          setLoading(true);
+          const currentPrompt = prompt;
+          setPrompt(""); // Clear input immediately
+
+          setHistory((h) => h + `\n> ${currentPrompt}\n`);
+
           try {
             const res = await fetch(`${BASE_URL}/agent/prompt`, {
               method: "POST",
               headers: { "content-type": "application/json" },
-              body: JSON.stringify({ prompt, sessionId }),
+              body: JSON.stringify({ prompt: currentPrompt, sessionId }),
             });
             const data = await res.json();
-            setHistory(
-              (h) =>
-                h +
-                "\n> " +
-                prompt +
-                "\n" +
-                (data.summary || JSON.stringify(data, null, 2)) +
-                "\n"
-            );
 
+            // Display Agent Summary
+            const reply =
+              data.summary ||
+              (data.ok ? "Action completed." : `Error: ${data.error}`);
+            setHistory((h) => h + `${reply}\n`);
+
+            // Handle UI Updates based on Tool Results
             if (data && data.ok && Array.isArray(data.actions)) {
               for (const a of data.actions) {
                 const toolName = a?.action?.tool;
                 const result = a?.result;
-                if (!toolName) continue;
+
+                // 1. Handle Availability (Show Slots)
                 if (toolName === "availability" && result) {
                   if (result.slots) setLastSlots(result.slots);
-                  else if (result.appointments)
-                    setLastSlots(result.appointments);
+
+                  // Update Doctor Info Context
                   if (result.doctor) setLastDoctor(result.doctor);
-                  else if (
-                    a.action.input &&
-                    (a.action.input.doctorId || a.action.input.doctorName)
-                  ) {
+                  else if (a.action.input?.doctorName) {
                     setLastDoctor({
-                      id: a.action.input.doctorId,
                       name: a.action.input.doctorName,
+                      id: a.action.input.doctorId,
                     });
                   }
                 }
+
+                // 2. Handle Schedule (Clear Slots on Success)
                 if (toolName === "schedule" && a.ok) {
                   setLastSlots([]);
+                  // Optional: Show success animation or toast here
                 }
               }
             }
           } catch (err) {
-            setHistory((h) => h + "\n[agent error] " + String(err) + "\n");
+            setHistory((h) => h + `\n[Network Error] ${String(err)}\n`);
+          } finally {
+            setLoading(false);
           }
-          setPrompt("");
         }
 
         async function scheduleSlot(slot) {
@@ -385,10 +277,11 @@
             doctorId: lastDoctor ? lastDoctor.id : undefined,
             doctorName: lastDoctor ? lastDoctor.name : "Dr. Ahuja",
             patientName: "Jane User",
-            patientEmail: "jane@example.com",
+            patientEmail: "jane@example.com", // In a real app, ask user for this
             start: slot.start,
             end: slot.end,
           };
+
           try {
             const res = await fetch(`${BASE_URL}/mcp/invoke`, {
               method: "POST",
@@ -396,19 +289,21 @@
               body: JSON.stringify({ tool: "schedule", input, sessionId }),
             });
             const j = await res.json();
+
             const englishText = convertToEnglish(j);
             setHistory(
               (h) =>
                 h +
-                "\n> Booking: " +
-                new Date(slot.start).toLocaleString() +
-                "\n" +
-                englishText +
-                "\n"
+                `\n> Booking slot: ${new Date(
+                  slot.start
+                ).toLocaleTimeString()}\n${englishText}\n`
             );
-            setLastSlots([]);
+
+            if (j.ok) {
+              setLastSlots([]); // Clear slots after booking
+            }
           } catch (err) {
-            setHistory((h) => h + "\n❌ Schedule error: " + String(err) + "\n");
+            setHistory((h) => h + `\n❌ Schedule error: ${String(err)}\n`);
           }
         }
 
@@ -422,17 +317,25 @@
               "div",
               { className: "history" },
               history ||
-                "Chat history will appear here. Try asking: 'Check Dr. Ahuja availability tomorrow morning'"
+                "Chat history will appear here. Try: 'Book Dr. Sharma for 10am'"
             )
           ),
+
+          // Doctor Context Info
           lastDoctor
             ? React.createElement(
                 "div",
                 { className: "card doctor-info" },
                 React.createElement("strong", null, `👨‍⚕️ ${lastDoctor.name}`),
-                React.createElement("div", null, ` (ID: ${lastDoctor.id})`)
+                React.createElement(
+                  "div",
+                  null,
+                  ` (ID: ${lastDoctor.id || "Unknown"})`
+                )
               )
             : null,
+
+          // Slot Buttons
           lastSlots && lastSlots.length > 0
             ? React.createElement(
                 "div",
@@ -449,22 +352,21 @@
                     React.createElement(
                       "button",
                       {
-                        key: s.id,
+                        key: s.id || s.start,
                         className: "slot-button",
                         onClick: () => scheduleSlot(s),
                       },
-                      `${new Date(s.start).toLocaleTimeString([], {
+                      new Date(s.start).toLocaleTimeString([], {
                         hour: "2-digit",
                         minute: "2-digit",
-                      })} - ${new Date(s.end).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}`
+                      })
                     )
                   )
                 )
               )
             : null,
+
+          // Input Area
           React.createElement(
             "div",
             { className: "card" },
@@ -475,16 +377,18 @@
                 rows: 3,
                 value: prompt,
                 onChange: (e) => setPrompt(e.target.value),
-                placeholder:
-                  'Ask for availability, book appointments, or get reports. E.g., "Check Dr. Ahuja availability tomorrow morning"',
+                placeholder: "Type your request here...",
                 onKeyPress: (e) => {
-                  if (e.key === "Enter" && e.ctrlKey) send();
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    send();
+                  }
                 },
               }),
               React.createElement(
                 "button",
-                { onClick: send },
-                "📤 Send Message"
+                { onClick: send, disabled: loading },
+                loading ? "Thinking..." : "📤 Send Message"
               )
             )
           )
