@@ -6,7 +6,7 @@ import path from 'path';
 import fs from 'fs';
 import { listTools, invokeTool } from './mcpServer.js';
 import { initDb } from './db.js';
-import { runAgent } from './integrations/agent.js';
+import { runAgent } from './agent/index.js';
 import { sendSlackNotification } from './integrations/slack.js';
 import { getAuthUrl, getTokensFromCode, hasValidTokens, createCalendarEvent } from './integrations/calendar.js';
 import { createDoctorToken, createPatientToken, authMiddleware, doctorMiddleware, patientMiddleware } from './integrations/auth.js';

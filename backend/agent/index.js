@@ -1,12 +1,9 @@
-import { callLLM } from './llm.js';
-import { invokeTool } from '../mcpServer.js';
-import { generateSummary } from './summarizer.js';
-import { parser } from './parser.js';
 import { executor } from './executor.js';
 import { SYSTEM_INSTRUCTIONS } from './insturctions.js';
+import { callLLM } from '../integrations/llm.js';
+import { parser } from './parser.js';
+import { generateSummary } from './summarizer.js';
 
-// === THE FIX IS HERE ===
-// We provide specific examples for ALL tools so the AI doesn't get lazy/biased.
 
 
 const messages = [{ role: "system", content: SYSTEM_INSTRUCTIONS }];

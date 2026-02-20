@@ -1,3 +1,4 @@
+import { callLLM } from "../integrations/llm.js";
 export async function generateSummary(userPrompt, results) {
     // Format tool outputs for the LLM to read
     const resultsContext = results.map(r => {

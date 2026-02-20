@@ -1,4 +1,4 @@
-import { invokeTool } from "../mcpServer";
+import { invokeTool } from "../mcpServer.js";
 export async function executor(plan, sessionId, messages) {
     const results = [];
     for (const action of plan.actions) {
