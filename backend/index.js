@@ -4,7 +4,6 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
-
 import { listTools, invokeTool } from './mcpServer.js';
 import { initDb } from './db.js';
 import { runAgent } from './integrations/agent.js';
